@@ -3,13 +3,11 @@ use std::{
     fs::File,
     io::{Read, Write},
     path::Path,
-    thread,
     time::Duration,
 };
 
 use clap::Parser;
 use device_query::{DeviceQuery, DeviceState, Keycode};
-use enums::CommandType;
 use error::Error;
 use json_data::JsonData;
 use serial::SerialPort;

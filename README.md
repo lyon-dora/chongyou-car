@@ -64,6 +64,17 @@ Options:
 
 ```bash
 # 运行 data.json 文件
-rebot --file data.json      # 相对路径
-rebot --file C:\data.json   # 绝对路径
+robot --file data.json      # 相对路径
+robot --file C:\data.json   # 绝对路径
 ```
+
+| 按键 | 说明   |
+| ---- | ------ |
+| `w`  | `前进` |
+| `a`  | `左转` |
+| `d`  | `右转` |
+| `x`  | `后退` |
+| `s`  | `停止` |
+| `1`  | `1档`  |
+| `2`  | `2挡`  |
+| `3`  | `3挡`  |
