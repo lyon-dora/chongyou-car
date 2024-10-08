@@ -92,27 +92,6 @@ async fn main() -> anyhow::Result<()> {
     let mut prev_keys = vec![];
     loop {
         let keys = device_state.get_keys();
-        // if !keys.is_empty() {
-        // match keys[0] {
-        //     Keycode::W => {
-        //         tx_key.send((0.1, 0.0)).await.ok();
-        //     }
-        //     Keycode::A => {
-        //         tx_key.send((0.0, 0.1)).await.ok();
-        //     }
-        //     Keycode::S => {
-        //         tx_key.send((0.0, 0.0)).await.ok();
-        //     }
-        //     Keycode::D => {
-        //         tx_key.send((0.0, -0.1)).await.ok();
-        //     }
-        //     Keycode::X => {
-        //         tx_key.send((-0.1, 0.0)).await.ok();
-        //     }
-        //     _ => {}
-        // }
-        // println!("{:?}", keys);
-        // }
         if keys != prev_keys {
             // println!("{:?}", keys);
             if !keys.is_empty() {
