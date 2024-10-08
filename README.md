@@ -68,6 +68,27 @@ robot --file data.json      # 相对路径
 robot --file C:\data.json   # 绝对路径
 ```
 
+## 键盘控制
+
+On `ubuntu/Debian`:
+
+```bash
+sudo apt install libx11-dev
+```
+
+On `Fedora/RHEL/CentOS`:
+
+```bash
+sudo dnf install xorg-x11-server-devel
+```
+
+运行
+
+```bash
+cargo b -r
+./target/release/robot -f data.json
+```
+
 | 按键 | 说明   |
 | ---- | ------ |
 | `w`  | `前进` |
