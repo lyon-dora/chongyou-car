@@ -8,15 +8,12 @@ use std::{
 };
 
 use clap::Parser;
+use device_query::{DeviceQuery, DeviceState, Keycode};
 use enums::CommandType;
 use error::Error;
 use json_data::JsonData;
 use serial::SerialPort;
-use tokio::{
-    io::{self, AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-    sync::mpsc,
-};
+use tokio::sync::mpsc;
 
 mod command;
 mod config;
@@ -38,14 +35,6 @@ struct Cli {
     /// json file required
     #[arg(short, long)]
     file: String,
-
-    /// ip (eg: 192.168.0.10)
-    #[arg(long)]
-    ip: Option<String>,
-
-    /// port (eg: 8080)
-    #[arg(long)]
-    port: Option<u16>,
 }
 
 #[tokio::main]
@@ -72,62 +61,87 @@ async fn main() -> anyhow::Result<()> {
         serde_json::from_str::<Vec<JsonData>>(&json).map_err(|_| Error::DecodeJsonFail)?;
     println!("{:?}", json_data);
 
-    // robot ip
-    // let robot_ip = if let Some(ip) = cli.ip {
-    //     ip
-    // } else {
-    //     env::var(config::ROBOT_IP)?
-    // };
-    // // robot port
-    // let robot_port = if let Some(port) = cli.port {
-    //     port
-    // } else {
-    //     env::var(config::ROBOT_PORT)?
-    //         .parse()
-    //         .map_err(|_| Error::PortFail)?
-    // };
-
     // serial port
     let serial_port = env::var(config::SERIAL_PORT).map_err(|_| Error::SerialPortFail)?;
 
     // 连接串口
-    let mut com = serial::open(&serial_port).map_err(|_| Error::SerialConnectFail)?;
+    const COM_SETTINGS: serial::PortSettings = serial::PortSettings {
+        baud_rate: serial::Baud115200,
+        char_size: serial::Bits8,
+        parity: serial::ParityNone,
+        stop_bits: serial::Stop1,
+        flow_control: serial::FlowNone,
+    };
 
-    com.reconfigure(&|settings| {
-        settings.set_baud_rate(serial::Baud115200)?;
-        settings.set_char_size(serial::Bits8);
-        settings.set_parity(serial::ParityNone);
-        settings.set_stop_bits(serial::Stop1);
-        settings.set_flow_control(serial::FlowNone);
-        Ok(())
-    })
-    .map_err(|_| Error::SerialSettingsSetFail)?;
+    let mut com = serial::open(&serial_port).map_err(|_| Error::SerialConnectFail)?;
+    com.configure(&COM_SETTINGS)
+        .map_err(|_| Error::SerialSettingsSetFail)?;
     com.set_timeout(Duration::from_millis(1000))
         .map_err(|_| Error::SerialSetTimeoutFail)?;
 
     // 消息通道
-    let (tx, mut rx) = mpsc::channel::<Vec<u8>>(100);
+    let (tx_key, mut rx_key) = mpsc::channel::<(f64, f64)>(100);
 
-    // 读取文件， 后期读取dora数据流
     tokio::spawn(async move {
-        for json in json_data {
-            thread::sleep(Duration::from_millis(json.sleep_second));
-
-            let data = match json.command {
-                // 差速小车
-                CommandType::DifferSpeed { x, y, w } => {
-                    // println!("send_speed_to_x4chassis: {x}, {y}, {w}");
-                    command::send_speed_to_x4chassis(x, y, w)
-                }
-            };
-
-            tx.send(data).await.ok();
+        while let Some((x, w)) = rx_key.recv().await {
+            let data = command::send_speed_to_x4chassis(x, 0.0, w);
+            com.write_all(&data).ok();
         }
     });
 
-    while let Some(data) = rx.recv().await {
-        com.write_all(&data).ok();
+    let mut r = 1.0;
+    let device_state = DeviceState::new();
+    let mut prev_keys = vec![];
+    loop {
+        let keys = device_state.get_keys();
+        // if !keys.is_empty() {
+        // match keys[0] {
+        //     Keycode::W => {
+        //         tx_key.send((0.1, 0.0)).await.ok();
+        //     }
+        //     Keycode::A => {
+        //         tx_key.send((0.0, 0.1)).await.ok();
+        //     }
+        //     Keycode::S => {
+        //         tx_key.send((0.0, 0.0)).await.ok();
+        //     }
+        //     Keycode::D => {
+        //         tx_key.send((0.0, -0.1)).await.ok();
+        //     }
+        //     Keycode::X => {
+        //         tx_key.send((-0.1, 0.0)).await.ok();
+        //     }
+        //     _ => {}
+        // }
+        // println!("{:?}", keys);
+        // }
+        if keys != prev_keys {
+            // println!("{:?}", keys);
+            if !keys.is_empty() {
+                match keys[0] {
+                    Keycode::W => {
+                        tx_key.send((0.2 * r, 0.0)).await.ok();
+                    }
+                    Keycode::A => {
+                        tx_key.send((0.0, 0.2 * r)).await.ok();
+                    }
+                    Keycode::S => {
+                        tx_key.send((0.0, 0.0)).await.ok();
+                    }
+                    Keycode::D => {
+                        tx_key.send((0.0, -0.2 * r)).await.ok();
+                    }
+                    Keycode::X => {
+                        tx_key.send((-0.2 * r, 0.0)).await.ok();
+                    }
+                    Keycode::Key1 => r = 1.0,
+                    Keycode::Key2 => r = 2.0,
+                    Keycode::Key3 => r = 3.0,
+                    _ => {}
+                }
+                // println!("{:?}", keys);
+            }
+        }
+        prev_keys = keys;
     }
-
-    Ok(())
 }
